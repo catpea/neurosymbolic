@@ -2,6 +2,8 @@
 
 A browser OS where the AI lives at runtime, reads every command's source code, and edits the corpus from inside the chat.
 
+WARNING: This is a coding agent harness that writes code to disk (loads it in the browser only). Please use this program in a home laboratory only, and in a container. We must all work on advancing AI, as a result this program is best ran in a home laboratory setting.
+
 ---
 
 Commands are XML. Each one carries its own JavaScript.
