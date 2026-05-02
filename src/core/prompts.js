@@ -31,6 +31,9 @@ async function readFirstPrompt(urls) {
   throw lastError ?? new Error("No prompt files configured.");
 }
 
+export const AGENTS = ["sophia", "alice", "betty", "cindy", "daisy", "emma"];
+export const SKILLS = ["step-by-step", "check-first", "minimal", "explain-and-do"];
+
 export function loadWebMcpPrompt() {
   return readPrompt(new URL("../prompts/webmcp.md", import.meta.url));
 }
@@ -40,4 +43,16 @@ export function loadSoulPrompt() {
     new URL("../prompts/soul.md", import.meta.url),
     new URL("../prompst/soul.md", import.meta.url)
   ]);
+}
+
+export function loadAgentPrompt(name) {
+  const safe = name?.toLowerCase().replace(/[^a-z]/g, "");
+  if (!AGENTS.includes(safe)) throw new Error(`Unknown agent: ${name}`);
+  return readPrompt(new URL(`../prompts/${safe}.md`, import.meta.url));
+}
+
+export function loadSkillPrompt(name) {
+  const safe = name?.toLowerCase().replace(/[^a-z-]/g, "");
+  if (!SKILLS.includes(safe)) throw new Error(`Unknown skill: ${name}`);
+  return readPrompt(new URL(`../prompts/skills/${safe}.md`, import.meta.url));
 }

@@ -11,27 +11,107 @@ export function makeTemplate(name, category = 'system') {
   <Description></Description>
   <Parameters/>
   <Output type="void" />
-  <Function>
+  <Function><![CDATA[
 export async function main(parameters, context) {
 
 }
-  </Function>
+  ]]></Function>
 </Command>`;
+}
+
+// ── XML sanitization ─────────────────────────────────────────────────────────
+//
+// Wraps bare <Function>…</Function> content in CDATA so that JS operators
+// like &&, ||, <, > do not break the XML parser.
+// Skips blocks already wrapped in CDATA and self-closing <Function/> tags.
+
+export function sanitizeCommandXml(text) {
+  return text.replace(
+    /(<Function[^/]*?>)([\s\S]*?)(<\/Function>)/g,
+    (_, open, content, close) => {
+      // Unwrap any existing CDATA sections (including partial/misplaced ones the AI wrote).
+      // Replace each <![CDATA[...]]> with just its inner text.
+      let clean = content.replace(/<!\[CDATA\[([\s\S]*?)]]>/g, '$1');
+      // Remove any orphaned CDATA openers or closers left over.
+      clean = clean.replace(/<!\[CDATA\[/g, '').replace(/]]>/g, '');
+      // Wrap in a single CDATA section so all JS characters are safe.
+      return `${open}<![CDATA[${clean}]]>${close}`;
+    }
+  );
+}
+
+// ── JSON → XML conversion ────────────────────────────────────────────────────
+//
+// Converts a JSON command description to valid Command XML.
+// The AI can use JSON to avoid XML character escaping entirely.
+//
+// Expected JSON shape:
+//   { name, path?, title?, category, synopsis?, description, parameters: [{name,type,required,default?,description?}],
+//     outputType?, component?, improve?, function: "js source code" }
+
+export function commandJsonToXml(jsonText) {
+  const d = typeof jsonText === 'string' ? JSON.parse(jsonText) : jsonText;
+
+  const params = (d.parameters || []).map(p => {
+    const attrStr = Object.entries(p)
+      .map(([k, v]) => `${k}="${String(v).replace(/"/g, '&quot;')}"`)
+      .join(' ');
+    return `    <Parameter ${attrStr} />`;
+  }).join('\n');
+
+  const examples = (d.examples || []).map(e =>
+    `    <Example title="${(e.title || '').replace(/"/g, '&quot;')}">${e.xml || ''}</Example>`
+  ).join('\n');
+
+  const fnBlock = d.function
+    ? `\n  <Function><![CDATA[\n${d.function}\n  ]]></Function>`
+    : '';
+
+  const examplesBlock = examples
+    ? `\n  <Examples>\n${examples}\n  </Examples>`
+    : '';
+
+  return `<Command name="${d.name}" path="${d.path || `/cmd/${d.category || 'system'}/${d.name}`}" title="${d.title || d.name}" category="${d.category || 'uncategorized'}">
+  <Synopsis>${d.synopsis || d.name}</Synopsis>
+  <Description>${d.description || ''}</Description>
+  <Parameters>
+${params}
+  </Parameters>
+  <Output type="${d.outputType || 'component'}" component="${d.component || ''}" />${examplesBlock}
+  <Improve>${d.improve || ''}</Improve>${fnBlock}
+</Command>`;
+}
+
+// ── XML validation ───────────────────────────────────────────────────────────
+//
+// Returns { doc, error: string|null }.
+// error is non-null if the document is a parsererror rather than valid XML.
+
+export function parseAndValidateXml(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  // When DOMParser fails, the entire document root becomes the parsererror element.
+  // Check the root tag (case-insensitive) — not descendants, to avoid false positives.
+  const rootTag = doc.documentElement?.tagName?.toLowerCase() ?? '';
+  if (rootTag === 'parsererror' || rootTag === 'parseerror') {
+    const msg = doc.documentElement.textContent?.trim().split('\n')[0] || 'XML parse error';
+    return { doc: null, error: msg };
+  }
+  return { doc, error: null };
 }
 
 // ── Function extraction ──────────────────────────────────────────────────────
 //
-// The AI always sees <Function> with inline JS.
+// The AI always sees <Function> with inline JS (possibly in CDATA).
 // The server always stores <Function src="src/index.js"/> + a separate JS file.
 //
-// extractFunctions() bridges the two: it parses the XML the AI wrote,
+// extractFunctions() bridges the two: it sanitizes the XML, parses it,
 // pulls out inline <Function> content, replaces each node with a src reference,
 // and returns the files to be saved separately.
 
 export function extractFunctions(xmlText, commandName) {
-  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-  const parseErr = doc.querySelector('parseerror');
-  if (parseErr) throw new Error(`Invalid XML: ${parseErr.textContent.trim().split('\n')[0]}`);
+  const sanitized = sanitizeCommandXml(xmlText);
+  const { doc, error } = parseAndValidateXml(sanitized);
+  if (error) throw new Error(`Invalid XML: ${error}`);
 
   const files = [];
 
@@ -46,7 +126,6 @@ export function extractFunctions(xmlText, commandName) {
       url: `/xml/commands/${commandName}/src/${filename}`,
     });
 
-    // Replace inline content with a src reference
     while (fn.firstChild) fn.removeChild(fn.firstChild);
     fn.setAttribute('src', `src/${filename}`);
   }
@@ -63,8 +142,8 @@ export function extractFunctions(xmlText, commandName) {
 // inline the content so the AI can read it.
 
 export async function hydrateXmlFunctions(xmlText, commandName, context) {
-  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-  if (doc.querySelector('parseerror')) return xmlText;
+  const { doc } = parseAndValidateXml(xmlText);
+  if (!doc) return xmlText;
 
   const fns = [...doc.querySelectorAll('Function[src]')];
   if (!fns.length) return xmlText;
@@ -84,14 +163,10 @@ export async function hydrateXmlFunctions(xmlText, commandName, context) {
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
-//
-// Full save: extract <Function> inline content → PUT each JS file →
-// POST or PUT the Command XML.
 
 export async function saveCommand(name, xmlText, { method = 'POST' } = {}, context) {
   const { xml, files } = extractFunctions(xmlText, name);
 
-  // JS files first (parallel)
   await Promise.all(files.map(({ url, content }) =>
     context.fetch(url, {
       method:  'PUT',
@@ -108,9 +183,6 @@ export async function saveCommand(name, xmlText, { method = 'POST' } = {}, conte
 }
 
 // ── Editor card ──────────────────────────────────────────────────────────────
-//
-// A Bootstrap card with a monospace textarea and a Save button.
-// onSave(xmlText) should return a Response (or throw).
 
 export function makeEditorCard(title, xmlText, onSave) {
   const card = document.createElement('div');
@@ -167,7 +239,6 @@ export function makeEditorCard(title, xmlText, onSave) {
   return card;
 }
 
-// Prepend a goal hint paragraph to an editor card's body
 export function addGoalHint(card, goal) {
   if (!goal) return;
   const p = document.createElement('p');

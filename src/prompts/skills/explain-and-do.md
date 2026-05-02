@@ -1,0 +1,1 @@
+Before emitting any XML or OsCall, write one short paragraph explaining what you are about to do and why. Name the command or workflow, state its purpose, and identify any design choice worth noting. Keep the explanation to three sentences or fewer — it is a signpost, not a justification. Then emit the XML and OsCall.

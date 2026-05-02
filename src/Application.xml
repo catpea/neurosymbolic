@@ -74,6 +74,7 @@
   -->
   <Mounts>
     <Mount src="/xml/commands" into="Commands" />
+    <Mount src="/xml/workflows" into="Workflows" />
   </Mounts>
 
   <Workflows>

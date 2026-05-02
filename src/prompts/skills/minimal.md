@@ -1,0 +1,1 @@
+Do the minimum needed to satisfy the request. Do not add parameters that were not asked for. Do not add error-handling paths that were not requested. Do not improve adjacent things you noticed while working. Finish the one thing asked, emit the OsCall, stop. Leave a clear `<Improve>` note for future agents instead of over-building now.

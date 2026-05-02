@@ -1,6 +1,7 @@
 import { ReactiveHTMLElement } from "@/core/reactive.js";
-import { loadSoulPrompt, loadWebMcpPrompt } from "@/core/prompts.js";
+import { loadSoulPrompt, loadWebMcpPrompt, loadAgentPrompt, loadSkillPrompt, AGENTS } from "@/core/prompts.js";
 import { attrs, cssEscape } from "@/core/xml.js";
+import { extractFunctions, sanitizeCommandXml, commandJsonToXml } from "@/core/command-utils.js";
 
 class XOS extends ReactiveHTMLElement {
   static observedAttributes = ["fs"];
@@ -186,37 +187,128 @@ class XOS extends ReactiveHTMLElement {
     };
   }
 
-  async systemPromptMessages() {
-    const [soulPrompt, webMcpPrompt] = await Promise.all([
-      loadSoulPrompt(),
-      loadWebMcpPrompt()
-    ]);
-
-    return [soulPrompt, webMcpPrompt]
-      .filter(Boolean)
-      .map(content => ({ role: "system", content }));
+  async systemPromptMessages(agent = null, skills = []) {
+    const soulLoader = agent ? loadAgentPrompt(agent) : loadSoulPrompt();
+    const loaders = [soulLoader, loadWebMcpPrompt(), ...skills.map(s => loadSkillPrompt(s).catch(() => null))];
+    const results = await Promise.all(loaders);
+    return results.filter(Boolean).map(content => ({ role: "system", content }));
   }
 
-  async aiChat(goal, history = []) {
-    const messages = [
-      ...(await this.systemPromptMessages()),
-      { role: "system", content: "Live OS snapshot:\n" + JSON.stringify(this.mcpSnapshot(), null, 2) },
-      ...history
-        .filter(message => message.role === "user" || message.role === "assistant")
-        .map(message => ({
-          role: message.role,
-          content: message.content
-        })),
-      { role: "user", content: goal }
-    ];
+  // Parse a single <Plan> block from AI response text.
+  // Returns { plan: {title, steps} | null, cleaned: text without the Plan block }
+  extractPlan(responseText) {
+    const match = responseText.match(/<Plan[\s\S]*?<\/Plan>/);
+    if (!match) return { plan: null, cleaned: responseText };
 
+    const raw = match[0];
+    const titleM = raw.match(/title="([^"]*)"/);
+    const title = titleM?.[1] || "Plan";
+
+    const steps = [];
+    const stepRe = /<Step\s([^>]*)>([\s\S]*?)<\/Step>/g;
+    let sm;
+    while ((sm = stepRe.exec(raw)) !== null) {
+      const idM    = sm[1].match(/id="([^"]*)"/);
+      const agentM = sm[1].match(/agent="([^"]*)"/);
+      steps.push({ id: idM?.[1] || String(steps.length + 1), agent: agentM?.[1] || "", text: sm[2].trim() });
+    }
+
+    return { plan: { title, steps }, cleaned: responseText.replace(raw, "").trim() };
+  }
+
+  // Parse <OsCall> blocks from AI response text and execute each one.
+  // Returns { calls: [{use, name, status, message}], cleaned: text without OsCall blocks }
+  async executeOsCalls(responseText) {
+    const calls = [];
+    const regex = /<OsCall\s([^>]*)>([\s\S]*?)<\/OsCall>/g;
+    let match;
+    const blocks = [];
+
+    while ((match = regex.exec(responseText)) !== null) {
+      blocks.push({ full: match[0], attrs: match[1], body: match[2] });
+    }
+
+    for (const block of blocks) {
+      const useMatch = block.attrs.match(/use="([^"]+)"/);
+      const nameMatch = block.attrs.match(/name="([^"]+)"/);
+      const methodMatch = block.attrs.match(/method="([^"]+)"/i);
+
+      const use = useMatch?.[1];
+      const name = nameMatch?.[1];
+      const method = methodMatch?.[1]?.toUpperCase() || "POST";
+
+      if (!use || !name) {
+        calls.push({ use, name, status: "error", message: "OsCall missing use or name attribute" });
+        continue;
+      }
+
+      try {
+        if (use === "save-command") {
+          const raw = block.body.trim();
+
+          // Detect JSON body and convert to XML (AI fallback format)
+          let xmlBody = raw;
+          if (raw.startsWith("{")) {
+            try { xmlBody = commandJsonToXml(raw); }
+            catch (e) { throw new Error(`JSON→XML conversion failed: ${e.message}`); }
+          }
+
+          // Sanitize: wrap bare <Function> content in CDATA so JS operators don't break parsing
+          const sanitized = sanitizeCommandXml(xmlBody);
+
+          let cleanXml, files;
+          try {
+            ({ xml: cleanXml, files } = extractFunctions(sanitized, name));
+          } catch (parseErr) {
+            calls.push({ use, name, status: "parse-error", message: parseErr.message, sanitizedBody: sanitized, method });
+            continue;
+          }
+
+          await Promise.all(files.map(({ url, content }) =>
+            fetch(url, { method: "PUT", headers: { "Content-Type": "text/plain" }, body: content })
+          ));
+          const res = await fetch(`/xml/commands/${name}`, {
+            method,
+            headers: { "Content-Type": "application/xml" },
+            body: cleanXml
+          });
+          if (!res.ok) {
+            const detail = await res.text().catch(() => "");
+            throw new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
+          }
+          calls.push({ use, name, status: "saved", message: `Command '${name}' saved (${method})` });
+
+        } else if (use === "save-workflow") {
+          const res = await fetch(`/xml/workflows/${name}`, {
+            method,
+            headers: { "Content-Type": "application/xml" },
+            body: block.body.trim()
+          });
+          if (!res.ok) {
+            const detail = await res.text().catch(() => "");
+            throw new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
+          }
+          calls.push({ use, name, status: "saved", message: `Workflow '${name}' saved (${method})` });
+        } else {
+          calls.push({ use, name, status: "error", message: `Unknown OsCall: ${use}` });
+        }
+      } catch (err) {
+        calls.push({ use, name, status: "error", message: err.message });
+      }
+    }
+
+    const cleaned = responseText.replace(/<OsCall[\s\S]*?<\/OsCall>/g, "").trim();
+    return { calls, cleaned };
+  }
+
+  async callAI(messages) {
     const response = await fetch("/api/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages,
         temperature: 0.4,
-        max_tokens: 2048,
+        max_tokens: 8192,
         stream: false
       })
     });
@@ -227,7 +319,39 @@ class XOS extends ReactiveHTMLElement {
     }
 
     const data = await response.json();
-    return data?.choices?.[0]?.message?.content || JSON.stringify(data, null, 2);
+    return data?.choices?.[0]?.message?.content || "";
+  }
+
+  async aiChat(goal, history = [], { agent = null, skills = [], onOsCall = null } = {}) {
+    const messages = [
+      ...(await this.systemPromptMessages(agent, skills)),
+      { role: "system", content: "Live OS snapshot:\n" + JSON.stringify(this.mcpSnapshot(), null, 2) },
+      ...history
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => ({ role: m.role, content: m.content })),
+      { role: "user", content: goal }
+    ];
+
+    let reply = await this.callAI(messages);
+
+    const { plan, cleaned: afterPlan } = this.extractPlan(reply);
+    const { calls, cleaned } = await this.executeOsCalls(afterPlan);
+
+    if (calls.length > 0 && onOsCall) {
+      onOsCall(calls);
+    }
+
+    // If there were OsCalls, do a follow-up turn so AI can acknowledge results
+    if (calls.length > 0) {
+      const results = calls.map(c => `[OsCall ${c.use} name="${c.name}": ${c.status} — ${c.message}]`).join("\n");
+      messages.push({ role: "assistant", content: reply });
+      messages.push({ role: "user", content: `OS call results:\n${results}\n\nSummarize what was done.` });
+      const followUp = await this.callAI(messages);
+      const { cleaned: cleanedFollowUp } = await this.executeOsCalls(followUp);
+      return { reply: cleanedFollowUp || cleaned, calls, plan };
+    }
+
+    return { reply: cleaned || reply, calls, plan };
   }
 
   renderScreen() {

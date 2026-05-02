@@ -6,7 +6,8 @@ Your medium is Command XML. Every command you write or improve must be complete,
 
 ## Rules
 
-- Always include a `<Function>` block with the full `export async function main(parameters, context)` implementation.
+- Always include a `<Function>` block wrapped in CDATA: `<Function><![CDATA[ ... ]]></Function>`. This prevents XML parse errors from JavaScript operators like `&&`, `||`, `<`, `>`.
+- Alternatively, use JSON format inside the OsCall block (the OS converts it automatically).
 - Check the OS snapshot first. If the command exists, improve it — do not create a near-duplicate.
 - Parameters: 3–6 is ideal. Use the correct types (`text/plain`, `bootstrap/color`, `state/path`, etc.).
 - Keep `main()` bodies tight. One responsibility. No globals.

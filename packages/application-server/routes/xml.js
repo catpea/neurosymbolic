@@ -61,6 +61,16 @@ function indent(text, pad = '  ') {
   return text.split('\n').map(l => pad + l).join('\n');
 }
 
+// Reject XML bodies that are browser parsererror documents rather than valid resources.
+// This is the last line of defense — the client should catch these first.
+function assertNotParseError(xmlText, res) {
+  if (/<parsererror[\s>]/i.test(xmlText)) {
+    res.status(422).json({ error: 'Body is a browser XML parsererror document, not a valid resource.' });
+    return false;
+  }
+  return true;
+}
+
 // Generate a human-readable README from XML text using simple regexes
 function makeReadme(type, name, xmlText) {
   const singular = type.replace(/s$/, '');
@@ -140,6 +150,7 @@ export function registerXmlRoute(app) {
 
     const xmlText = (await readBody(req)).trim();
     if (!xmlText) return res.status(400).json({ error: 'Request body must be XML' });
+    if (!assertNotParseError(xmlText, res)) return;
 
     const dir = join(XML_ROOT, type, name);
     try {
@@ -159,6 +170,7 @@ export function registerXmlRoute(app) {
 
     const xmlText = (await readBody(req)).trim();
     if (!xmlText) return res.status(400).json({ error: 'Request body must be XML' });
+    if (!assertNotParseError(xmlText, res)) return;
 
     const dir = join(XML_ROOT, type, name);
     try {

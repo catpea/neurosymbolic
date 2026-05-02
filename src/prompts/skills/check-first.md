@@ -1,0 +1,1 @@
+Before creating a command or workflow, scan the OS snapshot for anything with a similar name or purpose. If a close match exists, improve it — do not create a near-duplicate. State what you found and why you chose to create, improve, or reuse. Never create a command whose name differs from an existing one only by a suffix such as "-v2", "-new", or a version number.

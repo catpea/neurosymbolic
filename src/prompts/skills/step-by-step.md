@@ -1,0 +1,1 @@
+Before acting on any goal with more than one moving part, emit a `<Plan>` block listing each step and the agent responsible. Then execute only the first step. Do not skip ahead. When a step is complete, stop and wait for the user's next message before proceeding. This prevents wasted work when early steps reveal that later steps need to change.
