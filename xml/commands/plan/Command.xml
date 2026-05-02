@@ -1,0 +1,10 @@
+<Command name="plan" path="/cmd/ai/plan" title="Plan From Goal" category="ai">
+  <Synopsis>plan goal="user goal"</Synopsis>
+  <Description>Turns a user goal into markdown instructions. It does not execute tools.</Description>
+  <Parameters>
+    <Parameter name="goal" type="text/plain" required="true" description="The user request to analyze." />
+    <Parameter name="style" type="enum" required="false" default="concise" description="Planning style: concise, detailed, xml-first, or patch-first." />
+  </Parameters>
+  <Output type="markdown" />
+  <Improve>Improve this command when the AI needs better planning discipline. Do not create tiny planners such as bug-plan or ui-plan.</Improve>
+</Command>

@@ -1,0 +1,117 @@
+
+<Application name="ai-unix" version="0.1.0">
+
+  <Screen>
+    <Navbar title="AI Unix" placement="top" color="dark">
+      <Button text="Commands" icon="bi-terminal" target="#commands-modal" toggle="modal" />
+      <Button text="AI Chat" icon="bi-stars" target="#ai-chat" toggle="offcanvas" />
+    </Navbar>
+
+    <Main class="container py-3 mb-5">
+      <Panel use="main-panel" />
+    </Main>
+
+    <Navbar title="/proc/current-state" placement="bottom" color="dark">
+      <StateLabel />
+      <Button text="Home" icon="bi-house" to="/application/shell" />
+    </Navbar>
+
+    <Offcanvas id="ai-chat" title="AI webMCP" placement="end">
+      <AIChat placeholder="Describe the command or workflow you want..." />
+    </Offcanvas>
+
+    <Modal id="commands-modal" title="Command Corpus" size="fullscreen">
+      <CommandList />
+    </Modal>
+  </Screen>
+
+  <State name="application" initial="shell">
+    <State name="shell" title="AI Unix Shell">
+      <Workflow on="enter" use="show-shell" />
+      <Workflow on="resume" use="show-shell" />
+
+      <State name="hello-world" title="Hello World">
+        <Workflow on="enter" use="hello-world" />
+        <Workflow on="resume" use="hello-world" />
+
+        <State name="hello-universe" title="Hello Universe">
+          <Workflow on="enter" use="hello-universe" />
+        </State>
+      </State>
+    </State>
+  </State>
+
+  <Interfaces>
+    <Panel name="main-panel">
+      <Chat name="main-chat" />
+    </Panel>
+  </Interfaces>
+
+  <Components>
+    <Component name="panel" tag="x-panel" />
+    <Component name="chat" tag="x-chat" />
+    <Component name="alert" tag="x-alert" />
+    <Component name="button" tag="x-button" />
+    <Component name="ai-chat" tag="x-ai-chat" />
+  </Components>
+
+  <!--
+    Commands declared here are built-in categories only.
+    Individual Command definitions are stored in xml/commands/ and mounted at boot.
+  -->
+  <Commands root="/cmd">
+    <Category name="interface"  title="Interface" />
+    <Category name="navigation" title="Navigation" />
+    <Category name="ai"         title="AI" />
+    <Category name="system"     title="System" />
+  </Commands>
+
+  <!--
+    Mounts are resolved at boot before the screen renders.
+    Each Mount fetches src via HTTP and appends its children into the target element.
+    src  — URL to fetch (returns a <Commands>, <Workflows>, etc. wrapper)
+    into — CSS selector of the target element in this document
+  -->
+  <Mounts>
+    <Mount src="/xml/commands" into="Commands" />
+  </Mounts>
+
+  <Workflows>
+    <Workflow name="show-shell" title="Show Shell" category="system">
+      <Variables>
+        <Variable name="message" value="AI Unix: ability lives in /cmd, programs live in /workflows, state lives in /proc." />
+      </Variables>
+
+      <Action use="cls" />
+      <Action use="alert" text="$message" color="info" />
+      <Action use="goto" to="hello-world" text="Run Hello World" color="primary" />
+    </Workflow>
+
+    <Workflow name="hello-world" title="Hello World" category="demo">
+      <Variables>
+        <Variable name="message" value="Hello World" />
+        <Variable name="alertColor" value="primary" />
+        <Variable name="nextState" value="hello-universe" />
+        <Variable name="buttonText" value="Go to Hello Universe" />
+      </Variables>
+
+      <Action use="cls" />
+      <Action use="alert" text="$message" color="$alertColor" />
+      <Action use="goto" to="$nextState" text="$buttonText" color="secondary" />
+    </Workflow>
+
+    <Workflow name="hello-universe" title="Hello Universe" category="demo">
+      <Variables>
+        <Variable name="message" value="Hello Universe" />
+        <Variable name="alertColor" value="success" />
+        <Variable name="nextState" value=".." />
+        <Variable name="buttonText" value="Go to Hello World" />
+      </Variables>
+
+      <Action use="cls" />
+      <Action use="alert" text="$message" color="$alertColor" />
+      <Action use="goto" to="$nextState" text="$buttonText" color="secondary" />
+    </Workflow>
+  </Workflows>
+
+</Application>

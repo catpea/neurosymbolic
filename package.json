@@ -1,0 +1,46 @@
+{
+  "type": "module",
+  "main": "index.js",
+
+  "name": "neurosymbolic",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+
+  "workspaces": [
+    "packages/*"
+  ],
+
+  "scripts": {
+
+    "start":   "pm daemon ecosystem.json",
+    "dev":     "NODE_ENV=development pm daemon ecosystem.json",
+    "stop":    "pm stop ecosystem.json",
+    "restart": "pm restart ecosystem.json",
+    "logs":    "pm logs",
+
+    "save": "git add .; git commit -m 'Updated Release'; npm version patch; npm publish; git push --follow-tags;"
+  },
+
+  "dependencies": {
+    "process-manager": "^1.0.0",
+    "application-server": "^1.0.0"
+  },
+
+  "author": "catpea (https://github.com/catpea)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/catpea/neurosymbolic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/catpea/neurosymbolic/issues"
+  },
+  "homepage": "https://github.com/catpea/neurosymbolic",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/catpea"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "process-manager",
+  "version": "1.0.0",
+  "description": "Lightweight process orchestrator for Undercity network services",
+  "type": "module",
+  "bin": {
+    "pm": "./pm.js"
+  }
+}

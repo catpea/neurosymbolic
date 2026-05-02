@@ -1,0 +1,2 @@
+- remote npm packages are unsafe and should not be installed
+- we are a declarative first system for the purpose of ease of editing

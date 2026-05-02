@@ -1,0 +1,13 @@
+<Command name="cls" path="/cmd/interface/cls" title="Clear Chat" category="interface">
+  <Synopsis>cls</Synopsis>
+  <Description>Clears the conversational output area.</Description>
+  <Parameters>
+    <Parameter name="none" type="none" required="false" description="This command accepts no settings." />
+  </Parameters>
+  <Output type="void" />
+  <Examples>
+    <Example title="Clear the main chat"><Action use="cls" /></Example>
+  </Examples>
+  <Improve>Keep this command small. Add targeting later only if multiple output devices exist.</Improve>
+  <Function src="src/index.js"/>
+</Command>

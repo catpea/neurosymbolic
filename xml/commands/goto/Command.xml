@@ -1,0 +1,17 @@
+<Command name="goto" path="/cmd/navigation/goto" title="Goto State Button" category="navigation">
+  <Synopsis>goto to="state-path" text="Continue" color="secondary"</Synopsis>
+  <Description>Prints a button that moves the OS to another state path.</Description>
+  <Parameters>
+    <Parameter name="to" type="state/path" required="true" description="Child state, parent state using .., or absolute path such as /application/shell." />
+    <Parameter name="text" type="text/plain" required="false" default="Continue" description="Button label." />
+    <Parameter name="color" type="bootstrap/color" required="false" default="secondary" description="Bootstrap button color." />
+    <Parameter name="icon" type="bootstrap/icon" required="false" description="Optional Bootstrap Icons class such as bi-house." />
+  </Parameters>
+  <Output type="component" component="button" />
+  <Examples>
+    <Example title="Child state"><Action use="goto" to="hello-world" text="Run Hello World" color="primary" /></Example>
+    <Example title="Parent state"><Action use="goto" to=".." text="Back" color="secondary" /></Example>
+  </Examples>
+  <Improve>Make this command stronger like a Unix tool. Add optional behavior as settings rather than creating separate navigation commands.</Improve>
+  <Function src="src/index.js"/>
+</Command>

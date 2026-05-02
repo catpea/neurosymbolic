@@ -1,0 +1,14 @@
+<Command name="program-ui" path="/cmd/ai/program-ui" title="Program UI" category="ai">
+  <Synopsis>program-ui goal="change the Screen"</Synopsis>
+  <Description>Lets the AI propose or apply Screen XML through controlled OSCall operations.</Description>
+  <Parameters>
+    <Parameter name="goal" type="text/plain" required="true" description="Desired UI change." />
+    <Parameter name="mode" type="enum" required="false" default="propose" description="propose or apply." />
+  </Parameters>
+  <Output type="xml/screen" />
+  <Examples>
+    <Example title="Read Screen"><OSCall name="get-screen" /></Example>
+    <Example title="Replace Screen"><OSCall name="replace-screen"><Screen /></OSCall></Example>
+  </Examples>
+  <Improve>Keep Screen as the source of truth. Prefer Bootstrap classes over custom CSS.</Improve>
+</Command>

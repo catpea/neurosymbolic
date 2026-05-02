@@ -1,0 +1,14 @@
+<Command name="command-builder" path="/cmd/ai/command-builder" title="CommandBuilder" category="ai">
+  <Synopsis>command-builder goal="shape a command" format="xml" mode="draft"</Synopsis>
+  <Description>Provides a stronger command authoring environment when raw XML or JSON becomes too cramped for careful editing.</Description>
+  <Parameters>
+    <Parameter name="goal" type="text/plain" required="true" description="What the command needs to do." />
+    <Parameter name="format" type="enum" required="false" default="xml" description="Preferred output shape: xml, json, js, or mixed." />
+    <Parameter name="mode" type="enum" required="false" default="draft" description="draft, refine, or refactor." />
+    <Parameter name="target" type="command/name" required="false" description="Existing command to evolve." />
+  </Parameters>
+  <Output type="xml/command" />
+  <Output type="json/schema" />
+  <Output type="javascript/module" />
+  <Improve>Use this when command structure is the real problem. Prefer a few capable parameterized commands over many wrappers.</Improve>
+</Command>

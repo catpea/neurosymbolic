@@ -1,0 +1,20 @@
+{
+  "apps": [
+
+    {
+      "name":            "application-server",
+      "script":          "node_modules/application-server/index.js",
+      "instances":       1,
+      "watch_paths":     ["packages", "src", "public"],
+      "env": {
+        "PORT": "11222",
+        "AI_URL":"http://localhost:8080"
+      },
+      "env_development": {
+        "NODE_ENV": "development"
+      },
+      "max_restarts": 5
+    }
+
+  ]
+}

@@ -1,0 +1,13 @@
+<Command name="ask-os" path="/cmd/ai/ask-os" title="Ask OS" category="ai">
+  <Synopsis>ask-os question="What commands can render UI?"</Synopsis>
+  <Description>Allows the AI to ask the live OS a question by using OSCall messages.</Description>
+  <Parameters>
+    <Parameter name="question" type="text/plain" required="true" description="Question about commands, workflows, screen, state, or command manuals." />
+  </Parameters>
+  <Output type="json" />
+  <Examples>
+    <Example title="List commands"><OSCall name="list-commands" /></Example>
+    <Example title="Describe alert"><OSCall name="describe-command" command="alert" /></Example>
+  </Examples>
+  <Improve>Strengthen this command by adding more OSCall operations, not by giving the AI hidden authority.</Improve>
+</Command>

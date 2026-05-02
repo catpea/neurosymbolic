@@ -1,0 +1,13 @@
+{
+  "name":        "application-server",
+  "version":     "1.0.0",
+  "description": "Application HTTP server — static assets, project API, AI routes",
+  "type":        "module",
+  "main":        "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "web-framework": "^1.0.0"
+  }
+}

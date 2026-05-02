@@ -1,0 +1,12 @@
+<Command name="create-command" path="/cmd/ai/create-command" title="Create Command" category="ai">
+  <Synopsis>create-command name="command-name" category="category" goal="reusable ability"</Synopsis>
+  <Description>Adds new reusable ability to the command corpus.</Description>
+  <Parameters>
+    <Parameter name="name" type="command/name" required="true" description="Stable command name." />
+    <Parameter name="category" type="command/category" required="true" description="Command category." />
+    <Parameter name="goal" type="text/plain" required="true" description="Reusable ability the command provides." />
+  </Parameters>
+  <Output type="xml/command" />
+  <Output type="javascript/module" />
+  <Improve>Use this only when composition or command improvement is insufficient.</Improve>
+</Command>

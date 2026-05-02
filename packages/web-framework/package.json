@@ -1,0 +1,10 @@
+{
+  "name": "web-framework",
+  "version": "1.0.0",
+  "description": "Minimal Express-compatible HTTP web framework — Node built-ins only",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

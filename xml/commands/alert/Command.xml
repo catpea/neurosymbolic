@@ -1,0 +1,15 @@
+<Command name="alert" path="/cmd/interface/alert" title="Show Alert" category="interface">
+  <Synopsis>alert text="Message" color="primary"</Synopsis>
+  <Description>Prints a Bootstrap alert into the conversational interface.</Description>
+  <Parameters>
+    <Parameter name="text" type="text/plain" required="true" description="Message text shown inside the alert." />
+    <Parameter name="color" type="bootstrap/color" required="false" default="primary" description="Bootstrap semantic color: primary, secondary, success, danger, warning, info, light, dark." />
+  </Parameters>
+  <Output type="component" component="alert" />
+  <Examples>
+    <Example title="Primary alert"><Action use="alert" text="Hello World" color="primary" /></Example>
+    <Example title="Success alert"><Action use="alert" text="Saved" color="success" /></Example>
+  </Examples>
+  <Improve>Prefer strengthening this command with optional icon, title, dismissible, or markdown settings rather than creating narrow commands such as success-alert or error-alert.</Improve>
+  <Function src="src/index.js"/>
+</Command>

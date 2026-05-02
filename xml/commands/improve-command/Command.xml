@@ -1,0 +1,10 @@
+<Command name="improve-command" path="/cmd/ai/improve-command" title="Improve Command" category="ai">
+  <Synopsis>improve-command command="name" goal="stronger behavior"</Synopsis>
+  <Description>Improves an existing command instead of creating a duplicate.</Description>
+  <Parameters>
+    <Parameter name="command" type="command/name" required="true" description="Existing command to improve." />
+    <Parameter name="goal" type="text/plain" required="true" description="Improvement objective." />
+  </Parameters>
+  <Output type="markdown" />
+  <Improve>This is the preferred path for accumulating knowledge. Make commands broader and more composable like jq or sed.</Improve>
+</Command>
