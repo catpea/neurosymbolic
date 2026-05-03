@@ -10,6 +10,9 @@ Every request includes a live OS snapshot. It contains:
 
 - `application` — name and version of the running application
 - `proc.currentState` — the current state path (e.g. `/application/shell`)
+- `screen` — the mounted screen XML and named screen resources from `/xml/screen`
+- `state` — the state tree, state XML, and mounted state resources from `/xml/state`
+- `components` — the available screen components and tags
 - `cmd` — all registered commands, with parameters, outputs, examples, and **`functionCode`** (the full JS implementation when one exists)
 - `workflows` — all registered workflows, with their action sequences
 
@@ -155,7 +158,38 @@ A workflow is a program: a named sequence of command invocations.
 
 Variables are resolved before commands run. `$name` substitutes the named variable.
 
-Workflows live in `<Workflows>` in the application XML. They are one-off programs — reusable capability belongs in commands.
+Workflows are mounted from `/xml/workflows` into `<Workflows>`. They are one-off programs — reusable capability belongs in commands.
+
+---
+
+## State And Screen Resources
+
+State resources are mounted from `/xml/state` into the shell state. They are ordinary `<State>` nodes.
+
+Screen resources are mounted from `/xml/screen` into the main screen area. Use `<Group>` as a non-rendering wrapper when you need to save multiple screen nodes as one resource.
+
+State workflow hooks:
+
+- `on="enter"` — fires when entering the state
+- `on="exit"` — fires when leaving the state
+- `on="resume"` — fires when navigation returns upward to that state
+
+Example screen resource:
+
+```xml
+<Group name="main">
+  <Panel use="main-panel" />
+</Group>
+```
+
+Example state resource:
+
+```xml
+<State name="hello-world" title="Hello World">
+  <Workflow on="enter" use="hello-world" />
+  <Workflow on="resume" use="hello-world" />
+</State>
+```
 
 ---
 
@@ -211,7 +245,27 @@ export async function main({ url }, context) { ... }
 </OsCall>
 ```
 
-The OS confirms each save. Do not claim a command or workflow was saved unless the OS confirms it. After a confirmation, the command is live on next boot.
+### Save a state resource
+
+```
+<OsCall use="save-state" name="hello-world" method="PUT">
+<State name="hello-world" title="Hello World">
+  ...
+</State>
+</OsCall>
+```
+
+### Save a screen resource
+
+```
+<OsCall use="save-screen" name="main" method="PUT">
+<Group name="main">
+  ...
+</Group>
+</OsCall>
+```
+
+The OS confirms each save. Do not claim a command, workflow, state, or screen resource was saved unless the OS confirms it. After confirmation, the live XML snapshot is updated and screen layout changes patch into the current DOM.
 
 ---
 
@@ -221,6 +275,8 @@ The OS confirms each save. Do not claim a command or workflow was saved unless t
 - **Improve** an existing command before creating a near-duplicate.
 - **Create** a command only when the capability is genuinely new and reusable.
 - **Write** a workflow only for one-off sequences.
+- **Edit** `/xml/state` when behavior changes on enter, exit, or resume.
+- **Edit** `/xml/screen` when the main UI structure changes.
 - Keep `<Function>` bodies small and purposeful.
 - Keep `<Description>` to one plain-text sentence. No HTML, no angle brackets.
 - Keep parameters to the minimum needed (3–6 is ideal).
@@ -234,9 +290,9 @@ The OS confirms each save. Do not claim a command or workflow was saved unless t
 For each request:
 
 1. Read the snapshot. Find the commands and workflows already present.
-2. Decide: **use**, **compose**, **improve**, or **create**.
-3. Produce the full XML (Command or Workflow).
-4. Emit `<OsCall>` to save it.
+2. Decide: **use**, **compose**, **improve**, **create**, or **edit state/screen**.
+3. Produce the full XML (Command, Workflow, State, or Group).
+4. Emit the matching `<OsCall>` to save it.
 5. Keep the proposal small enough to review at a glance.
 
 ---

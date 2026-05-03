@@ -1,14 +1,18 @@
 <Command name="program-ui" path="/cmd/ai/program-ui" title="Program UI" category="ai">
-  <Synopsis>program-ui goal="change the Screen"</Synopsis>
-  <Description>Lets the AI propose or apply Screen XML through controlled OSCall operations.</Description>
+  <Synopsis>program-ui goal="change the shell UI" mode="apply" screen="main" state="hello-world"</Synopsis>
+  <Description>Programs mounted screen and state resources through editor cards or a focused UI specialist turn.</Description>
   <Parameters>
     <Parameter name="goal" type="text/plain" required="true" description="Desired UI change." />
     <Parameter name="mode" type="enum" required="false" default="propose" description="propose or apply." />
+    <Parameter name="screen" type="text/plain" required="false" default="main" description="Mounted screen resource name in /xml/screen." />
+    <Parameter name="state" type="state/path" required="false" description="Target state path or leaf state name in /xml/state." />
   </Parameters>
   <Output type="xml/screen" />
+  <Output type="xml/state" />
   <Examples>
-    <Example title="Read Screen"><OSCall name="get-screen" /></Example>
-    <Example title="Replace Screen"><OSCall name="replace-screen"><Screen /></OSCall></Example>
+    <Example title="Open editors"><Action use="program-ui" goal="add a server health panel" mode="propose" screen="main" state="hello-world" /></Example>
+    <Example title="Apply with Cindy"><Action use="program-ui" goal="add a button that opens the health workflow" mode="apply" screen="main" state="/application/shell/hello-world" /></Example>
   </Examples>
-  <Improve>Keep Screen as the source of truth. Prefer Bootstrap classes over custom CSS.</Improve>
+  <Improve>Keep screen resources grouped and reviewable. Edit the smallest state and screen resources that satisfy the goal.</Improve>
+  <Function src="src/index.js"/>
 </Command>

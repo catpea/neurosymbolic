@@ -3,6 +3,8 @@ import { loadSoulPrompt, loadWebMcpPrompt, loadAgentPrompt, loadSkillPrompt, AGE
 import { attrs, cssEscape } from "@/core/xml.js";
 import { extractFunctions, sanitizeCommandXml, commandJsonToXml } from "@/core/command-utils.js";
 
+const SCREEN_META = Symbol("screenMeta");
+
 class XOS extends ReactiveHTMLElement {
   static observedAttributes = ["fs"];
 
@@ -14,6 +16,7 @@ class XOS extends ReactiveHTMLElement {
     this.root           = null;
     this.chat           = null;
     this.commandModules = new Map();
+    this.rootClickHandler = event => this.handleRootClick(event);
   }
 
   mount() {
@@ -53,6 +56,10 @@ class XOS extends ReactiveHTMLElement {
     this.root = document.querySelector("[data-os-root]") || document.createElement("div");
     this.root.dataset.osRoot = "";
     document.body.prepend(this.root);
+    if (!this.root.dataset.osWired) {
+      this.root.dataset.osWired = "true";
+      this.root.addEventListener("click", this.rootClickHandler);
+    }
 
     this.renderScreen();
     await this.enterInitialState();
@@ -112,7 +119,12 @@ class XOS extends ReactiveHTMLElement {
   // runtime module are definition-only (AI-facing) and skip silently.
   async loadCommandModules() {
     this.commandModules.clear();
-    await Promise.all(this.commands().map(async ({ name }) => {
+    const runtimeCommands = [...this.xml.querySelectorAll("Commands > Command")]
+      .filter(node => node.querySelector(":scope > Function"))
+      .map(node => node.getAttribute("name"))
+      .filter(Boolean);
+
+    await Promise.all(runtimeCommands.map(async name => {
       try {
         const mod = await import(`/xml/commands/${name}/src/index.js`);
         if (typeof mod.main === "function") this.commandModules.set(name, mod);
@@ -134,9 +146,17 @@ class XOS extends ReactiveHTMLElement {
         goto:    target => this.goto(target),
         current: ()     => this.signal("statePath").value,
       },
+      ai: {
+        chat: (goal, options = {}) => this.aiChat(goal, [], options),
+      },
+      os: {
+        syncResource: (type, name, xmlText) => this.syncResource(type, name, xmlText),
+        snapshot:     () => this.mcpSnapshot(),
+      },
       xml:       this.xml,
       commands:  () => this.commands(),
       workflows: () => this.workflows(),
+      components: () => this.components(),
     };
   }
 
@@ -169,6 +189,61 @@ class XOS extends ReactiveHTMLElement {
     }));
   }
 
+  components() {
+    if (!this.xml) return [];
+    return [...this.xml.querySelectorAll("Components > Component")].map(component => attrs(component));
+  }
+
+  mountSelector(type) {
+    return this.xml.querySelector(`Mounts > Mount[src="/xml/${type}"]`)?.getAttribute("into") || null;
+  }
+
+  mountTarget(type) {
+    const selector = this.mountSelector(type);
+    return selector ? this.xml.querySelector(selector) : null;
+  }
+
+  serializeNode(node) {
+    return node ? new XMLSerializer().serializeToString(node) : "";
+  }
+
+  screenResources() {
+    const target = this.mountTarget("screen");
+    if (!target) return [];
+
+    return [...target.children].map(node => ({
+      name: node.getAttribute("name") || "",
+      tag: node.tagName,
+      xml: this.serializeNode(node),
+    }));
+  }
+
+  stateResources() {
+    const target = this.mountTarget("state");
+    if (!target) return [];
+
+    return [...target.children].map(node => ({
+      name: node.getAttribute("name") || "",
+      title: node.getAttribute("title") || "",
+      xml: this.serializeNode(node),
+    }));
+  }
+
+  stateTree(node = this.xml?.querySelector("Application > State")) {
+    if (!node) return null;
+
+    return {
+      name: node.getAttribute("name") || "",
+      title: node.getAttribute("title") || "",
+      workflows: [...node.children]
+        .filter(child => child.tagName === "Workflow")
+        .map(workflow => attrs(workflow)),
+      children: [...node.children]
+        .filter(child => child.tagName === "State")
+        .map(child => this.stateTree(child)),
+    };
+  }
+
   mcpSnapshot() {
     if (!this.xml) return null;
 
@@ -182,9 +257,69 @@ class XOS extends ReactiveHTMLElement {
       proc: {
         currentState: this.signal("statePath").value || ""
       },
+      components: this.components(),
+      screen: {
+        xml: this.serializeNode(this.xml.querySelector("Application > Screen")),
+        resources: this.screenResources(),
+      },
+      state: {
+        xml: this.serializeNode(this.xml.querySelector("Application > State")),
+        tree: this.stateTree(),
+        resources: this.stateResources(),
+      },
       cmd: this.commands(),
       workflows: this.workflows()
     };
+  }
+
+  parseResourceElement(xmlText, label) {
+    const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+    const error = doc.querySelector("parsererror");
+    if (error) throw new Error(`Invalid ${label}: ${error.textContent}`);
+    return doc.documentElement;
+  }
+
+  upsertNamedNode(target, node, name) {
+    const imported = this.xml.importNode(node, true);
+    const existing = [...target.children].find(child => child.getAttribute?.("name") === name);
+
+    if (existing) {
+      existing.replaceWith(imported);
+    } else {
+      target.append(imported);
+    }
+
+    return imported;
+  }
+
+  async syncResource(type, name, xmlText) {
+    if (!this.xml) return;
+
+    const root = this.parseResourceElement(xmlText, `${type}/${name}`);
+
+    if (type === "commands") {
+      const target = this.xml.querySelector("Commands");
+      if (!target) return;
+      this.upsertNamedNode(target, root, name);
+      await this.hydrateCommandFunctions();
+      await this.loadCommandModules();
+      this.refreshCommandLists();
+      return;
+    }
+
+    if (type === "workflows") {
+      const target = this.xml.querySelector("Workflows");
+      if (!target) return;
+      this.upsertNamedNode(target, root, name);
+      return;
+    }
+
+    if (type === "state" || type === "screen") {
+      const target = this.mountTarget(type);
+      if (!target) return;
+      this.upsertNamedNode(target, root, name);
+      if (type === "screen" && this.root) this.renderScreen();
+    }
   }
 
   async systemPromptMessages(agent = null, skills = []) {
@@ -276,10 +411,17 @@ class XOS extends ReactiveHTMLElement {
             const detail = await res.text().catch(() => "");
             throw new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
           }
+          await this.syncResource("commands", name, cleanXml);
           calls.push({ use, name, status: "saved", message: `Command '${name}' saved (${method})` });
 
-        } else if (use === "save-workflow") {
-          const res = await fetch(`/xml/workflows/${name}`, {
+        } else if (use === "save-workflow" || use === "save-state" || use === "save-screen") {
+          const type = {
+            "save-workflow": "workflows",
+            "save-state": "state",
+            "save-screen": "screen",
+          }[use];
+
+          const res = await fetch(`/xml/${type}/${name}`, {
             method,
             headers: { "Content-Type": "application/xml" },
             body: block.body.trim()
@@ -288,7 +430,14 @@ class XOS extends ReactiveHTMLElement {
             const detail = await res.text().catch(() => "");
             throw new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
           }
-          calls.push({ use, name, status: "saved", message: `Workflow '${name}' saved (${method})` });
+          await this.syncResource(type, name, block.body.trim());
+
+          const noun = type === "workflows"
+            ? "Workflow"
+            : type === "state"
+              ? "State resource"
+              : "Screen resource";
+          calls.push({ use, name, status: "saved", message: `${noun} '${name}' saved (${method}).` });
         } else {
           calls.push({ use, name, status: "error", message: `Unknown OsCall: ${use}` });
         }
@@ -358,29 +507,29 @@ class XOS extends ReactiveHTMLElement {
     const screen = this.xml.querySelector("Application > Screen");
     if (!screen) throw new Error("Application requires a Screen element.");
 
-    this.root.replaceChildren();
-    for (const child of [...screen.children]) {
-      this.root.append(this.renderScreenNode(child));
-    }
+    this.reconcileScreenChildren(this.root, [...screen.children]);
 
     this.chat = this.root.querySelector('x-chat[name="main-chat"]') || this.root.querySelector("x-chat");
   }
 
   renderScreenNode(node) {
     const tag = node.tagName;
+    let rendered;
 
-    if (tag === "Navbar") return this.renderNavbar(node);
-    if (tag === "Main") return this.renderMain(node);
-    if (tag === "Panel") return this.renderPanelReference(node);
-    if (tag === "Chat") return this.element("x-chat", attrs(node));
-    if (tag === "Offcanvas") return this.renderOffcanvas(node);
-    if (tag === "Modal") return this.renderModal(node);
-    if (tag === "Button") return this.renderButton(node);
-    if (tag === "AIChat") return this.element("x-ai-chat", attrs(node));
-    if (tag === "CommandList") return this.element("x-command-list", attrs(node));
-    if (tag === "StateLabel") return this.renderStateLabel();
+    if (tag === "Navbar") rendered = this.renderNavbar(node);
+    else if (tag === "Main") rendered = this.renderMain(node);
+    else if (tag === "Group") rendered = this.renderGroup(node);
+    else if (tag === "Panel") rendered = this.renderPanelReference(node);
+    else if (tag === "Chat") rendered = this.element("x-chat", attrs(node));
+    else if (tag === "Offcanvas") rendered = this.renderOffcanvas(node);
+    else if (tag === "Modal") rendered = this.renderModal(node);
+    else if (tag === "Button") rendered = this.renderButton(node);
+    else if (tag === "AIChat") rendered = this.element("x-ai-chat", attrs(node));
+    else if (tag === "CommandList") rendered = this.element("x-command-list", attrs(node));
+    else if (tag === "StateLabel") rendered = this.renderStateLabel();
+    else rendered = this.renderUnknown(node);
 
-    return this.renderUnknown(node);
+    return this.markScreenNode(rendered, node);
   }
 
   renderNavbar(node) {
@@ -420,10 +569,19 @@ class XOS extends ReactiveHTMLElement {
     return main;
   }
 
+  renderGroup(node) {
+    const group = document.createElement("div");
+    group.dataset.osGroup = node.getAttribute("name") || "";
+    group.style.display = "contents";
+    for (const child of [...node.children]) group.append(this.renderScreenNode(child));
+    return group;
+  }
+
   renderPanelReference(node) {
     const name = node.getAttribute("use") || node.getAttribute("name");
     const source = this.xml.querySelector(`Interfaces > Panel[name="${cssEscape(name)}"]`);
     const panel = document.createElement("x-panel");
+    panel.dataset.panelUse = name || "";
 
     if (!source) {
       panel.append(this.muted(`Missing interface panel: ${name}`));
@@ -514,10 +672,6 @@ class XOS extends ReactiveHTMLElement {
       button.setAttribute(name, value);
     }
 
-    if (node.hasAttribute("to")) {
-      this.concern.on(button, "click", () => this.goto(node.getAttribute("to")));
-    }
-
     return button;
   }
 
@@ -534,6 +688,266 @@ class XOS extends ReactiveHTMLElement {
     box.className = "alert alert-warning";
     box.textContent = `Unknown Screen node: ${node.tagName}`;
     return box;
+  }
+
+  handleRootClick(event) {
+    const button = event.target?.closest?.("x-button[to]");
+    if (!button || !this.root?.contains(button)) return;
+
+    const to = button.getAttribute("to");
+    if (!to) return;
+
+    event.preventDefault();
+    this.goto(to).catch(error => console.error("x-os navigation failed", error));
+  }
+
+  screenNodeKey(node) {
+    const fields = {
+      Navbar: ["id", "placement", "title"],
+      Main: ["id", "name", "class"],
+      Group: ["name"],
+      Panel: ["use", "name"],
+      Chat: ["name"],
+      Offcanvas: ["id"],
+      Modal: ["id"],
+      Button: ["id", "to", "target", "toggle", "icon"],
+      AIChat: ["id", "placeholder"],
+      CommandList: ["id"],
+      StateLabel: ["id", "name"],
+    }[node.tagName] ?? ["id", "name", "use"];
+
+    const values = fields.map(field => node.getAttribute(field)).filter(Boolean);
+    return `${node.tagName}:${values.join("|")}`;
+  }
+
+  markScreenNode(rendered, sourceNode) {
+    if (rendered?.nodeType === Node.ELEMENT_NODE) {
+      rendered[SCREEN_META] = {
+        tag: sourceNode.tagName,
+        key: this.screenNodeKey(sourceNode),
+      };
+    }
+    return rendered;
+  }
+
+  matchesScreenNode(rendered, sourceNode) {
+    if (!rendered || rendered.nodeType !== Node.ELEMENT_NODE) return false;
+    const meta = rendered[SCREEN_META];
+    return !!meta && meta.tag === sourceNode.tagName && meta.key === this.screenNodeKey(sourceNode);
+  }
+
+  syncElementAttributes(element, sourceNode, names) {
+    for (const name of names) {
+      const value = sourceNode.getAttribute(name);
+      if (value === null) element.removeAttribute(name);
+      else element.setAttribute(name, value);
+    }
+  }
+
+  ensureScreenSlot(parent, tagName, slotName, className = "") {
+    let node = [...parent.children].find(child => child.dataset.osSlot === slotName);
+
+    if (node && node.tagName !== tagName.toUpperCase()) {
+      const replacement = document.createElement(tagName);
+      replacement.dataset.osSlot = slotName;
+      parent.insertBefore(replacement, node);
+      node.remove();
+      node = replacement;
+    } else if (!node) {
+      node = document.createElement(tagName);
+      node.dataset.osSlot = slotName;
+      parent.append(node);
+    }
+
+    if (className) node.className = className;
+    return node;
+  }
+
+  reconcileScreenChildren(parent, sourceChildren) {
+    const desired = sourceChildren.filter(child => child.nodeType === Node.ELEMENT_NODE);
+    let cursor = parent.firstElementChild;
+
+    for (const sourceNode of desired) {
+      let current = cursor;
+
+      if (!this.matchesScreenNode(current, sourceNode)) {
+        current = this.renderScreenNode(sourceNode);
+        parent.insertBefore(current, cursor);
+      }
+
+      this.patchScreenNode(current, sourceNode);
+      cursor = current.nextElementSibling;
+    }
+
+    while (cursor) {
+      const next = cursor.nextElementSibling;
+      cursor.remove();
+      cursor = next;
+    }
+  }
+
+  patchScreenNode(rendered, sourceNode) {
+    this.markScreenNode(rendered, sourceNode);
+
+    switch (sourceNode.tagName) {
+      case "Navbar":
+        this.patchNavbar(rendered, sourceNode);
+        return;
+      case "Main":
+        this.patchMain(rendered, sourceNode);
+        return;
+      case "Group":
+        this.patchGroup(rendered, sourceNode);
+        return;
+      case "Panel":
+        this.patchPanel(rendered, sourceNode);
+        return;
+      case "Chat":
+        this.patchChat(rendered, sourceNode);
+        return;
+      case "Offcanvas":
+        this.patchOffcanvas(rendered, sourceNode);
+        return;
+      case "Modal":
+        this.patchModal(rendered, sourceNode);
+        return;
+      case "Button":
+        this.patchButton(rendered, sourceNode);
+        return;
+      case "AIChat":
+        this.patchAIChat(rendered, sourceNode);
+        return;
+      case "CommandList":
+        this.patchCommandList(rendered);
+        return;
+      case "StateLabel":
+        this.patchStateLabel(rendered);
+        return;
+      default:
+        rendered.className = "alert alert-warning";
+        rendered.textContent = `Unknown Screen node: ${sourceNode.tagName}`;
+    }
+  }
+
+  patchNavbar(nav, sourceNode) {
+    const placement = sourceNode.getAttribute("placement") || "top";
+    const color = sourceNode.getAttribute("color") || "dark";
+
+    nav.className = [
+      "navbar",
+      `navbar-${color}`,
+      "bg-body-tertiary",
+      "border-secondary-subtle",
+      placement === "bottom" ? "fixed-bottom border-top" : "sticky-top border-bottom"
+    ].join(" ");
+
+    const box = this.ensureScreenSlot(nav, "div", "box", "container-fluid gap-2");
+    const brand = this.ensureScreenSlot(box, "span", "brand", "navbar-brand mb-0 h1");
+    const actions = this.ensureScreenSlot(box, "div", "actions", "d-flex align-items-center gap-2 ms-auto");
+
+    brand.textContent = sourceNode.getAttribute("title") || "AI Unix";
+    box.prepend(brand);
+    box.append(actions);
+
+    this.reconcileScreenChildren(actions, [...sourceNode.children]);
+  }
+
+  patchMain(main, sourceNode) {
+    main.className = sourceNode.getAttribute("class") || "container py-3";
+    this.reconcileScreenChildren(main, [...sourceNode.children]);
+  }
+
+  patchGroup(group, sourceNode) {
+    group.dataset.osGroup = sourceNode.getAttribute("name") || "";
+    group.style.display = "contents";
+    this.reconcileScreenChildren(group, [...sourceNode.children]);
+  }
+
+  patchPanel(panel, sourceNode) {
+    const name = sourceNode.getAttribute("use") || sourceNode.getAttribute("name") || "";
+    const source = this.xml.querySelector(`Interfaces > Panel[name="${cssEscape(name)}"]`);
+    const body = panel.querySelector(".card-body");
+    const target = body || panel;
+
+    panel.dataset.panelUse = name;
+
+    if (!source) {
+      target.replaceChildren(this.muted(`Missing interface panel: ${name}`));
+      return;
+    }
+
+    this.reconcileScreenChildren(target, [...source.children]);
+  }
+
+  patchChat(chat, sourceNode) {
+    this.syncElementAttributes(chat, sourceNode, ["name"]);
+  }
+
+  patchOffcanvas(box, sourceNode) {
+    const placement = sourceNode.getAttribute("placement") || "end";
+    box.className = `offcanvas offcanvas-${placement}`;
+    box.tabIndex = -1;
+    box.id = sourceNode.getAttribute("id") || "offcanvas";
+
+    const header = this.ensureScreenSlot(box, "div", "header", "offcanvas-header");
+    const title = this.ensureScreenSlot(header, "h5", "title", "offcanvas-title");
+    const close = this.ensureScreenSlot(header, "button", "close", "btn-close");
+    close.type = "button";
+    close.dataset.bsDismiss = "offcanvas";
+    close.ariaLabel = "Close";
+    title.textContent = sourceNode.getAttribute("title") || "Offcanvas";
+
+    const body = this.ensureScreenSlot(box, "div", "body", "offcanvas-body");
+    this.reconcileScreenChildren(body, [...sourceNode.children]);
+  }
+
+  patchModal(box, sourceNode) {
+    const id = sourceNode.getAttribute("id") || "modal";
+    const size = sourceNode.getAttribute("size") || "lg";
+
+    box.className = "modal fade";
+    box.tabIndex = -1;
+    box.id = id;
+
+    const dialog = this.ensureScreenSlot(box, "div", "dialog");
+    dialog.className = size === "fullscreen" ? "modal-dialog modal-fullscreen" : `modal-dialog modal-${size}`;
+
+    const content = this.ensureScreenSlot(dialog, "div", "content", "modal-content");
+    const header = this.ensureScreenSlot(content, "div", "header", "modal-header");
+    const title = this.ensureScreenSlot(header, "h5", "title", "modal-title");
+    const close = this.ensureScreenSlot(header, "button", "close", "btn-close");
+    close.type = "button";
+    close.dataset.bsDismiss = "modal";
+    close.ariaLabel = "Close";
+    title.textContent = sourceNode.getAttribute("title") || "Modal";
+
+    const body = this.ensureScreenSlot(content, "div", "body", "modal-body");
+    this.reconcileScreenChildren(body, [...sourceNode.children]);
+  }
+
+  patchButton(button, sourceNode) {
+    this.syncElementAttributes(button, sourceNode, ["text", "color", "to", "icon", "target", "toggle"]);
+  }
+
+  patchAIChat(chat, sourceNode) {
+    this.syncElementAttributes(chat, sourceNode, ["placeholder"]);
+  }
+
+  patchCommandList(list) {
+    if (typeof list.mount === "function") list.mount();
+  }
+
+  patchStateLabel(node) {
+    node.className = "badge text-bg-secondary font-monospace";
+    node.dataset.stateLabel = "";
+    node.textContent = this.signal("statePath").value || "";
+  }
+
+  refreshCommandLists() {
+    if (!this.root) return;
+    for (const node of this.root.querySelectorAll("x-command-list")) {
+      if (typeof node.mount === "function") node.mount();
+    }
   }
 
   element(tag, attributes = {}) {

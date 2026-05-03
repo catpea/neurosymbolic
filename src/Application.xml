@@ -7,9 +7,7 @@
       <Button text="AI Chat" icon="bi-stars" target="#ai-chat" toggle="offcanvas" />
     </Navbar>
 
-    <Main class="container py-3 mb-5">
-      <Panel use="main-panel" />
-    </Main>
+    <Main class="container-fluid px-3 px-lg-4 py-4 pb-5 mb-5" />
 
     <Navbar title="/proc/current-state" placement="bottom" color="dark">
       <StateLabel />
@@ -29,15 +27,6 @@
     <State name="shell" title="AI Unix Shell">
       <Workflow on="enter" use="show-shell" />
       <Workflow on="resume" use="show-shell" />
-
-      <State name="hello-world" title="Hello World">
-        <Workflow on="enter" use="hello-world" />
-        <Workflow on="resume" use="hello-world" />
-
-        <State name="hello-universe" title="Hello Universe">
-          <Workflow on="enter" use="hello-universe" />
-        </State>
-      </State>
     </State>
   </State>
 
@@ -53,6 +42,7 @@
     <Component name="alert" tag="x-alert" />
     <Component name="button" tag="x-button" />
     <Component name="ai-chat" tag="x-ai-chat" />
+    <Component name="command-list" tag="x-command-list" />
   </Components>
 
   <!--
@@ -75,44 +65,10 @@
   <Mounts>
     <Mount src="/xml/commands" into="Commands" />
     <Mount src="/xml/workflows" into="Workflows" />
+    <Mount src="/xml/state" into="Application > State[name=&quot;application&quot;] > State[name=&quot;shell&quot;]" />
+    <Mount src="/xml/screen" into="Application > Screen > Main" />
   </Mounts>
 
-  <Workflows>
-    <Workflow name="show-shell" title="Show Shell" category="system">
-      <Variables>
-        <Variable name="message" value="AI Unix: ability lives in /cmd, programs live in /workflows, state lives in /proc." />
-      </Variables>
-
-      <Action use="cls" />
-      <Action use="alert" text="$message" color="info" />
-      <Action use="goto" to="hello-world" text="Run Hello World" color="primary" />
-    </Workflow>
-
-    <Workflow name="hello-world" title="Hello World" category="demo">
-      <Variables>
-        <Variable name="message" value="Hello World" />
-        <Variable name="alertColor" value="primary" />
-        <Variable name="nextState" value="hello-universe" />
-        <Variable name="buttonText" value="Go to Hello Universe" />
-      </Variables>
-
-      <Action use="cls" />
-      <Action use="alert" text="$message" color="$alertColor" />
-      <Action use="goto" to="$nextState" text="$buttonText" color="secondary" />
-    </Workflow>
-
-    <Workflow name="hello-universe" title="Hello Universe" category="demo">
-      <Variables>
-        <Variable name="message" value="Hello Universe" />
-        <Variable name="alertColor" value="success" />
-        <Variable name="nextState" value=".." />
-        <Variable name="buttonText" value="Go to Hello World" />
-      </Variables>
-
-      <Action use="cls" />
-      <Action use="alert" text="$message" color="$alertColor" />
-      <Action use="goto" to="$nextState" text="$buttonText" color="secondary" />
-    </Workflow>
-  </Workflows>
+  <Workflows />
 
 </Application>

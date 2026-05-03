@@ -7,4 +7,5 @@
   </Parameters>
   <Output type="markdown" />
   <Improve>This is the preferred path for accumulating knowledge. Make commands broader and more composable like jq or sed.</Improve>
+  <Function src="src/index.js"/>
 </Command>

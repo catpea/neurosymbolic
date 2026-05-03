@@ -1,0 +1,8 @@
+<State name="hello-world" title="Hello World">
+  <Workflow on="enter" use="hello-world" />
+  <Workflow on="resume" use="hello-world" />
+
+  <State name="hello-universe" title="Hello Universe">
+    <Workflow on="enter" use="hello-universe" />
+  </State>
+</State>

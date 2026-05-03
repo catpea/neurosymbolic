@@ -1,0 +1,12 @@
+<Workflow name="hello-universe" title="Hello Universe" category="demo">
+  <Variables>
+    <Variable name="message" value="Hello Universe" />
+    <Variable name="alertColor" value="success" />
+    <Variable name="nextState" value=".." />
+    <Variable name="buttonText" value="Go to Hello World" />
+  </Variables>
+
+  <Action use="cls" />
+  <Action use="alert" text="$message" color="$alertColor" />
+  <Action use="goto" to="$nextState" text="$buttonText" color="secondary" />
+</Workflow>

@@ -25,7 +25,7 @@ export class AIChatElement extends ReactiveHTMLElement {
 
     const help = document.createElement("div");
     help.className = "alert alert-info small mb-0";
-    help.textContent = "The AI receives a live OS snapshot on every request. Agents save commands and workflows via OsCall.";
+    help.textContent = "The AI receives a live OS snapshot on every request. Agents can save commands, workflows, state, and screen resources via OsCall.";
 
     this.messagesNode = document.createElement("div");
     this.messagesNode.className = "vstack gap-2";
@@ -448,6 +448,17 @@ export class AIChatElement extends ReactiveHTMLElement {
       "",
       `Application: ${snapshot.application.name} ${snapshot.application.version}`,
       `Current state: ${snapshot.proc.currentState}`,
+      "",
+      "## Screen",
+      "",
+      ...((snapshot.screen?.resources ?? []).map(resource => [
+        `### ${resource.name || resource.tag}`,
+        `Tag: ${resource.tag}`,
+        ""
+      ].join("\n"))),
+      "## State",
+      "",
+      `Root: ${snapshot.state?.tree?.name || "application"}`,
       "",
       "## Commands",
       "",

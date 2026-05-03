@@ -1,0 +1,9 @@
+<Workflow name="show-shell" title="Show Shell" category="system">
+  <Variables>
+    <Variable name="message" value="AI Unix: ability lives in /cmd, programs live in /workflows, state lives in /proc." />
+  </Variables>
+
+  <Action use="cls" />
+  <Action use="alert" text="$message" color="info" />
+  <Action use="goto" to="hello-world" text="Run Hello World" color="primary" />
+</Workflow>

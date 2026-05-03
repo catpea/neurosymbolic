@@ -175,11 +175,31 @@ export async function saveCommand(name, xmlText, { method = 'POST' } = {}, conte
     })
   ));
 
-  return context.fetch(`/xml/commands/${name}`, {
+  const response = await context.fetch(`/xml/commands/${name}`, {
     method,
     headers: { 'Content-Type': 'application/xml' },
     body:    xml,
   });
+
+  if (response.ok) await context.os?.syncResource?.('commands', name, xml);
+  return response;
+}
+
+export async function readXmlResource(type, name, context) {
+  const response = await context.fetch(`/xml/${type}/${name}`);
+  if (!response.ok) return null;
+  return response.text();
+}
+
+export async function saveXmlResource(type, name, xmlText, { method = 'POST' } = {}, context) {
+  const response = await context.fetch(`/xml/${type}/${name}`, {
+    method,
+    headers: { 'Content-Type': 'application/xml' },
+    body: xmlText,
+  });
+
+  if (response.ok) await context.os?.syncResource?.(type, name, xmlText);
+  return response;
 }
 
 // ── Editor card ──────────────────────────────────────────────────────────────
@@ -245,4 +265,10 @@ export function addGoalHint(card, goal) {
   p.className = 'small text-body-secondary mb-0';
   p.textContent = `Goal: ${goal}`;
   card.querySelector('.card-body').insertBefore(p, card.querySelector('textarea'));
+}
+
+export function setEditorButtonLabel(card, text) {
+  const button = card.querySelector('button');
+  if (button) button.textContent = text;
+  return card;
 }

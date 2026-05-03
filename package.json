@@ -10,7 +10,7 @@
     "stop": "pm stop ecosystem.json",
     "restart": "pm restart ecosystem.json",
     "logs": "pm logs",
-    "store": "git add .; git commit -m 'Updated Code';",
+    "store": "git add .; git commit -m 'Updated Code Checkpoint';",
     "save": "git add .; git commit -m 'Updated Release'; npm version patch; npm publish; git push --follow-tags;"
   },
   "workspaces": [

@@ -11,4 +11,5 @@
   <Output type="json/schema" />
   <Output type="javascript/module" />
   <Improve>Use this when command structure is the real problem. Prefer a few capable parameterized commands over many wrappers.</Improve>
+  <Function src="src/index.js"/>
 </Command>

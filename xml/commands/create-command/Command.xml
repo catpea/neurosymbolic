@@ -9,4 +9,5 @@
   <Output type="xml/command" />
   <Output type="javascript/module" />
   <Improve>Use this only when composition or command improvement is insufficient.</Improve>
+  <Function src="src/index.js"/>
 </Command>
