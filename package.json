@@ -2,7 +2,7 @@
   "type": "module",
   "main": "index.js",
   "name": "neurosymbolic",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
   "scripts": {
     "start": "pm daemon ecosystem.json",
