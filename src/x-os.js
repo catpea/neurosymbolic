@@ -30,7 +30,18 @@ class XOS extends ReactiveHTMLElement {
       for (const node of document.querySelectorAll("[data-state-label]")) {
         node.textContent = path;
       }
+      this.emitSystemChange("state", { currentState: path });
     });
+  }
+
+  emitSystemChange(type, detail = {}) {
+    document.dispatchEvent(new CustomEvent("os:change", {
+      detail: {
+        type,
+        ...detail,
+        snapshot: this.mcpSnapshot(),
+      },
+    }));
   }
 
   async boot(selector) {
@@ -62,6 +73,7 @@ class XOS extends ReactiveHTMLElement {
     }
 
     this.renderScreen();
+    this.emitSystemChange("screen");
     await this.enterInitialState();
   }
 
@@ -194,6 +206,11 @@ class XOS extends ReactiveHTMLElement {
     return [...this.xml.querySelectorAll("Components > Component")].map(component => attrs(component));
   }
 
+  mounts() {
+    if (!this.xml) return [];
+    return [...this.xml.querySelectorAll("Mounts > Mount")].map(mount => attrs(mount));
+  }
+
   mountSelector(type) {
     return this.xml.querySelector(`Mounts > Mount[src="/xml/${type}"]`)?.getAttribute("into") || null;
   }
@@ -205,6 +222,16 @@ class XOS extends ReactiveHTMLElement {
 
   serializeNode(node) {
     return node ? new XMLSerializer().serializeToString(node) : "";
+  }
+
+  xmlNodeTree(node) {
+    if (!node) return null;
+
+    return {
+      tag: node.tagName,
+      attributes: attrs(node),
+      children: [...node.children].map(child => this.xmlNodeTree(child)),
+    };
   }
 
   screenResources() {
@@ -244,6 +271,22 @@ class XOS extends ReactiveHTMLElement {
     };
   }
 
+  screenTree(node = this.xml?.querySelector("Application > Screen")) {
+    return this.xmlNodeTree(node);
+  }
+
+  interfaceResources() {
+    const target = this.xml?.querySelector("Interfaces");
+    if (!target) return [];
+
+    return [...target.children].map(node => ({
+      name: node.getAttribute("name") || "",
+      tag: node.tagName,
+      xml: this.serializeNode(node),
+      tree: this.xmlNodeTree(node),
+    }));
+  }
+
   mcpSnapshot() {
     if (!this.xml) return null;
 
@@ -257,9 +300,15 @@ class XOS extends ReactiveHTMLElement {
       proc: {
         currentState: this.signal("statePath").value || ""
       },
+      mounts: this.mounts(),
       components: this.components(),
+      interfaces: {
+        xml: this.serializeNode(this.xml.querySelector("Interfaces")),
+        resources: this.interfaceResources(),
+      },
       screen: {
         xml: this.serializeNode(this.xml.querySelector("Application > Screen")),
+        tree: this.screenTree(),
         resources: this.screenResources(),
       },
       state: {
@@ -304,6 +353,7 @@ class XOS extends ReactiveHTMLElement {
       await this.hydrateCommandFunctions();
       await this.loadCommandModules();
       this.refreshCommandLists();
+      this.emitSystemChange("commands", { name });
       return;
     }
 
@@ -311,6 +361,7 @@ class XOS extends ReactiveHTMLElement {
       const target = this.xml.querySelector("Workflows");
       if (!target) return;
       this.upsertNamedNode(target, root, name);
+      this.emitSystemChange("workflows", { name });
       return;
     }
 
@@ -319,6 +370,7 @@ class XOS extends ReactiveHTMLElement {
       if (!target) return;
       this.upsertNamedNode(target, root, name);
       if (type === "screen" && this.root) this.renderScreen();
+      this.emitSystemChange(type, { name });
     }
   }
 
@@ -526,6 +578,7 @@ class XOS extends ReactiveHTMLElement {
     else if (tag === "Button") rendered = this.renderButton(node);
     else if (tag === "AIChat") rendered = this.element("x-ai-chat", attrs(node));
     else if (tag === "CommandList") rendered = this.element("x-command-list", attrs(node));
+    else if (tag === "SystemDashboard") rendered = this.element("x-system-dashboard", attrs(node));
     else if (tag === "StateLabel") rendered = this.renderStateLabel();
     else rendered = this.renderUnknown(node);
 
@@ -534,31 +587,7 @@ class XOS extends ReactiveHTMLElement {
 
   renderNavbar(node) {
     const nav = document.createElement("nav");
-    const placement = node.getAttribute("placement") || "top";
-    const color = node.getAttribute("color") || "dark";
-
-    nav.className = [
-      "navbar",
-      `navbar-${color}`,
-      "bg-body-tertiary",
-      "border-secondary-subtle",
-      placement === "bottom" ? "fixed-bottom border-top" : "sticky-top border-bottom"
-    ].join(" ");
-
-    const box = document.createElement("div");
-    box.className = "container-fluid gap-2";
-
-    const brand = document.createElement("span");
-    brand.className = "navbar-brand mb-0 h1";
-    brand.textContent = node.getAttribute("title") || "AI Unix";
-
-    const actions = document.createElement("div");
-    actions.className = "d-flex align-items-center gap-2 ms-auto";
-
-    for (const child of [...node.children]) actions.append(this.renderScreenNode(child));
-
-    box.append(brand, actions);
-    nav.append(box);
+    this.patchNavbar(nav, node);
     return nav;
   }
 
@@ -593,74 +622,14 @@ class XOS extends ReactiveHTMLElement {
   }
 
   renderOffcanvas(node) {
-    const placement = node.getAttribute("placement") || "end";
-    const id = node.getAttribute("id") || "offcanvas";
-
     const box = document.createElement("div");
-    box.className = `offcanvas offcanvas-${placement}`;
-    box.tabIndex = -1;
-    box.id = id;
-
-    const header = document.createElement("div");
-    header.className = "offcanvas-header";
-
-    const title = document.createElement("h5");
-    title.className = "offcanvas-title";
-    title.textContent = node.getAttribute("title") || "Offcanvas";
-
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "btn-close";
-    close.dataset.bsDismiss = "offcanvas";
-    close.ariaLabel = "Close";
-
-    const body = document.createElement("div");
-    body.className = "offcanvas-body";
-
-    for (const child of [...node.children]) body.append(this.renderScreenNode(child));
-
-    header.append(title, close);
-    box.append(header, body);
+    this.patchOffcanvas(box, node);
     return box;
   }
 
   renderModal(node) {
-    const id = node.getAttribute("id") || "modal";
-    const size = node.getAttribute("size") || "lg";
-
     const box = document.createElement("div");
-    box.className = "modal fade";
-    box.tabIndex = -1;
-    box.id = id;
-
-    const dialog = document.createElement("div");
-    dialog.className = size === "fullscreen" ? "modal-dialog modal-fullscreen" : `modal-dialog modal-${size}`;
-
-    const content = document.createElement("div");
-    content.className = "modal-content";
-
-    const header = document.createElement("div");
-    header.className = "modal-header";
-
-    const title = document.createElement("h5");
-    title.className = "modal-title";
-    title.textContent = node.getAttribute("title") || "Modal";
-
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "btn-close";
-    close.dataset.bsDismiss = "modal";
-    close.ariaLabel = "Close";
-
-    const body = document.createElement("div");
-    body.className = "modal-body";
-
-    for (const child of [...node.children]) body.append(this.renderScreenNode(child));
-
-    header.append(title, close);
-    content.append(header, body);
-    dialog.append(content);
-    box.append(dialog);
+    this.patchModal(box, node);
     return box;
   }
 
@@ -713,6 +682,7 @@ class XOS extends ReactiveHTMLElement {
       Button: ["id", "to", "target", "toggle", "icon"],
       AIChat: ["id", "placeholder"],
       CommandList: ["id"],
+      SystemDashboard: ["id"],
       StateLabel: ["id", "name"],
     }[node.tagName] ?? ["id", "name", "use"];
 
@@ -744,8 +714,24 @@ class XOS extends ReactiveHTMLElement {
     }
   }
 
+  classTokens(value = "") {
+    return String(value).split(/\s+/).filter(Boolean);
+  }
+
+  findScreenSlotCandidate(parent, tagName, className = "") {
+    const expectedTag = tagName.toUpperCase();
+    const requiredClasses = this.classTokens(className);
+
+    return [...parent.children].find(child => {
+      if (child.dataset.osSlot) return false;
+      if (child.tagName !== expectedTag) return false;
+      return requiredClasses.every(token => child.classList.contains(token));
+    }) || null;
+  }
+
   ensureScreenSlot(parent, tagName, slotName, className = "") {
-    let node = [...parent.children].find(child => child.dataset.osSlot === slotName);
+    let node = [...parent.children].find(child => child.dataset.osSlot === slotName)
+      || this.findScreenSlotCandidate(parent, tagName, className);
 
     if (node && node.tagName !== tagName.toUpperCase()) {
       const replacement = document.createElement(tagName);
@@ -759,8 +745,16 @@ class XOS extends ReactiveHTMLElement {
       parent.append(node);
     }
 
+    node.dataset.osSlot = slotName;
     if (className) node.className = className;
     return node;
+  }
+
+  pruneScreenChildren(parent, keep) {
+    const allowed = new Set(keep);
+    for (const child of [...parent.children]) {
+      if (!allowed.has(child)) child.remove();
+    }
   }
 
   reconcileScreenChildren(parent, sourceChildren) {
@@ -769,13 +763,15 @@ class XOS extends ReactiveHTMLElement {
 
     for (const sourceNode of desired) {
       let current = cursor;
+      let created = false;
 
       if (!this.matchesScreenNode(current, sourceNode)) {
         current = this.renderScreenNode(sourceNode);
         parent.insertBefore(current, cursor);
+        created = true;
       }
 
-      this.patchScreenNode(current, sourceNode);
+      if (!created) this.patchScreenNode(current, sourceNode);
       cursor = current.nextElementSibling;
     }
 
@@ -820,6 +816,9 @@ class XOS extends ReactiveHTMLElement {
       case "CommandList":
         this.patchCommandList(rendered);
         return;
+      case "SystemDashboard":
+        this.patchSystemDashboard(rendered);
+        return;
       case "StateLabel":
         this.patchStateLabel(rendered);
         return;
@@ -844,11 +843,10 @@ class XOS extends ReactiveHTMLElement {
     const box = this.ensureScreenSlot(nav, "div", "box", "container-fluid gap-2");
     const brand = this.ensureScreenSlot(box, "span", "brand", "navbar-brand mb-0 h1");
     const actions = this.ensureScreenSlot(box, "div", "actions", "d-flex align-items-center gap-2 ms-auto");
+    this.pruneScreenChildren(nav, [box]);
+    this.pruneScreenChildren(box, [brand, actions]);
 
-    brand.textContent = sourceNode.getAttribute("title") || "AI Unix";
-    box.prepend(brand);
-    box.append(actions);
-
+    brand.textContent = sourceNode.getAttribute("title") || "Neurosymbolic";
     this.reconcileScreenChildren(actions, [...sourceNode.children]);
   }
 
@@ -892,12 +890,14 @@ class XOS extends ReactiveHTMLElement {
     const header = this.ensureScreenSlot(box, "div", "header", "offcanvas-header");
     const title = this.ensureScreenSlot(header, "h5", "title", "offcanvas-title");
     const close = this.ensureScreenSlot(header, "button", "close", "btn-close");
+    const body = this.ensureScreenSlot(box, "div", "body", "offcanvas-body");
+    this.pruneScreenChildren(box, [header, body]);
+    this.pruneScreenChildren(header, [title, close]);
     close.type = "button";
     close.dataset.bsDismiss = "offcanvas";
     close.ariaLabel = "Close";
     title.textContent = sourceNode.getAttribute("title") || "Offcanvas";
 
-    const body = this.ensureScreenSlot(box, "div", "body", "offcanvas-body");
     this.reconcileScreenChildren(body, [...sourceNode.children]);
   }
 
@@ -911,17 +911,21 @@ class XOS extends ReactiveHTMLElement {
 
     const dialog = this.ensureScreenSlot(box, "div", "dialog");
     dialog.className = size === "fullscreen" ? "modal-dialog modal-fullscreen" : `modal-dialog modal-${size}`;
+    this.pruneScreenChildren(box, [dialog]);
 
     const content = this.ensureScreenSlot(dialog, "div", "content", "modal-content");
+    this.pruneScreenChildren(dialog, [content]);
     const header = this.ensureScreenSlot(content, "div", "header", "modal-header");
     const title = this.ensureScreenSlot(header, "h5", "title", "modal-title");
     const close = this.ensureScreenSlot(header, "button", "close", "btn-close");
+    const body = this.ensureScreenSlot(content, "div", "body", "modal-body");
+    this.pruneScreenChildren(content, [header, body]);
+    this.pruneScreenChildren(header, [title, close]);
     close.type = "button";
     close.dataset.bsDismiss = "modal";
     close.ariaLabel = "Close";
     title.textContent = sourceNode.getAttribute("title") || "Modal";
 
-    const body = this.ensureScreenSlot(content, "div", "body", "modal-body");
     this.reconcileScreenChildren(body, [...sourceNode.children]);
   }
 
@@ -935,6 +939,10 @@ class XOS extends ReactiveHTMLElement {
 
   patchCommandList(list) {
     if (typeof list.mount === "function") list.mount();
+  }
+
+  patchSystemDashboard(dashboard) {
+    if (typeof dashboard.refresh === "function") dashboard.refresh();
   }
 
   patchStateLabel(node) {

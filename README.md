@@ -1,102 +1,27 @@
 # Neurosymbolic
 
-A browser OS where the AI lives at runtime, reads every command's source code, and edits the corpus from inside the chat.
+Neurosymbolic is a browser operating system for programming with an AI that can see the live structure of the system it is changing. The central idea is simple but unusually strict: instead of treating the application as a pile of hidden files and asking a language model to guess what matters, the system projects its own moving parts into a declarative runtime snapshot. Commands, workflows, state, screen structure, components, and mounted resources are all surfaced in forms the AI can inspect directly. The model is not asked to hallucinate architecture. It is handed architecture as context.
 
-WARNING: This is a coding agent harness that writes code to disk (loads it in the browser only). Please use this program in a home laboratory only, and in a container. We must all work on advancing AI, as a result this program is best ran in a home laboratory setting.
+That decision changes everything downstream. Commands are not vague tool descriptions. They are XML definitions with parameters, outputs, examples, improvement notes, and, when behavior exists, their own JavaScript implementation. Workflows are not prose plans. They are executable compositions of commands. State is not an afterthought tucked behind a router. It is a symbolic world made of nested nodes with `enter`, `exit`, and `resume` events. Screen layout is not an opaque component tree hidden behind a bundler. It is declarative structure that can be mounted, patched, and discussed. The browser becomes a place where the operating system describes itself clearly enough that an AI can participate without pretending to know more than it does.
 
----
+The project is declarative first because editability is a stronger long-term value than raw code volume. A command lives in `xml/commands/<name>/Command.xml`. A workflow lives in `xml/workflows/<name>/Workflow.xml`. A mounted state branch lives in `xml/state/<name>/State.xml`. A mounted screen fragment lives in `xml/screen/<name>/Screen.xml`. `src/Application.xml` defines the shell frame and the mount points that pull those resources into the live document. This arrangement is intentionally conservative. It keeps the writable surfaces legible, local, and reviewable. It also allows the browser runtime to stay honest about what is actually editable through AI today and what still requires a JavaScript or XML patch.
 
-Commands are XML. Each one carries its own JavaScript.
+At boot, the system fetches `Application.xml`, resolves mounts, hydrates command functions from their source modules, imports runtime command code, and then renders the screen. The HTTP layer is deliberately small. The XML routes persist the declarative corpus to disk. The browser runtime then rehydrates that corpus into a living environment. The AI is not “calling tools” in the abstract. It is working against a concrete operating system whose rules are visible: `/cmd` holds reusable ability, `/workflows` holds one-off programs, mounted state resources grow the symbolic world, mounted screen resources shape the visible interface, and the runtime snapshot is the common language shared by the human, the browser, and the model.
 
-```xml
-<Command name="alert" path="/cmd/interface/alert" title="Show Alert" category="interface">
-  <Description>Prints a Bootstrap alert into the conversational interface.</Description>
-  <Function>
-export async function main({ text = "", color = "primary" }, context) {
-  const node = document.createElement("x-alert");
-  node.setAttribute("text", text);
-  node.setAttribute("color", color);
-  context.chat.print(node);
-}
-  </Function>
-</Command>
-```
+One of the strongest ideas captured here is that state is not merely navigation. State is presence. Entering a node can start work. Descending through child states can keep that work active. Exiting can stop it, summarize it, or publish a final card. Resume can re-establish context after moving back up the tree. This means the interface is not a passive screen flow. It is a traversable world where workflows often reach outward to remote systems and then return with rich cards that describe what just happened. A container can start when a state is entered, remain meaningful while the user moves deeper, and stop when the branch is left. A server check can become a ritual rather than a button. The operating system becomes partly symbolic theater, but with a rigorous event model underneath it.
 
-The AI receives this — code and all — on every single request.
+The choice to keep the end-user experience card-based is equally important. Neurosymbolic does not treat AI assistance as a demand for drag-and-drop builders, giant forms, or endless property editors. It assumes a different kind of programmer: someone who already knows what they want, who may be sketching ideas on paper, who wants crisp leverage rather than broad menus. Commands and workflows therefore print rich cards into a vertical stream. Cards can announce that a process started, that a remote server is healthy, that a workflow completed, or that a new choice is available. The interface stays inspectable and sequential. It reads like a logbook with agency instead of a dashboard full of dead glass.
 
----
+The dashboard extends that philosophy. A summary is already a form of intelligence because it selects structure from noise. The dashboard collects the live application snapshot and presents mounts, state, screen, workflows, commands, interfaces, and components as a navigable tree. The recent robot-enabled node actions take the next step: summary becomes contextual authorship. Every meaningful node can now open a dedicated drafting surface for AI work that is specific to that exact part of the system. A state node can offer templates for adding child states, refining lifecycle hooks, or designing operational journeys. A command category can offer templates for researching missing capability, improving an existing command, or generalizing narrow wrappers into stronger parameterized tools. A screen node can offer templates for evolving layout in place, expanding the local structure, or reconnecting the node to a state journey. The important point is not merely that prompts exist. It is that they are situated. The burden of “how do I ask the model to change this exact thing?” is reduced by the system itself.
 
-The OS boots by fetching `Application.xml`, resolving `<Mount>` declarations, hydrating every `<Function src="..."/>` with its live source, and importing each command module before the first pixel renders.
+That is one of the project’s most ambitious ideas: interface summary plus contextual AI templates becomes a new kind of programming surface. The human does not have to begin from blank prompting every time. They inspect the live structure, click the robot icon on the correct node, choose an already specialized action, and then adjust the draft with their own intent. The model receives a better prompt because the operating system has already done some of the explanatory work. In that sense, the dashboard is not just a monitoring view. It is a conversational compiler for developer intent.
 
-```xml
-<Mounts>
-  <Mount src="/xml/commands" into="Commands" />
-</Mounts>
-```
+Another idea captured here is the insistence that command design should remain parameterized rather than fragmenting into piles of near-duplicates. The system repeatedly pushes the AI toward improving an existing command before creating a sibling. This matters because language models are especially good at generating local novelty and especially dangerous when allowed to bloat a system with shallow wrappers. Neurosymbolic counters that tendency by encoding discipline into prompts, resource boundaries, mounted routes, and the shape of the dashboard actions. Reusable ability belongs in commands. One-off orchestration belongs in workflows. Structural UI belongs in mounted screen resources. Symbolic journey logic belongs in state. The architecture is trying to teach the AI how to stay small.
 
-One line. Every command in the corpus, loaded and alive.
+The live snapshot is the keystone. Every AI request includes the present application name and version, current state path, screen tree, state tree, mounted resources, command corpus, workflow corpus, and, when available, the actual JavaScript function bodies that power commands. This is not a vague “tool use” platform where the model pulls scraps of state from isolated APIs. It is a full operating context, delivered as a coherent object. That gives the model enough precision to propose exact XML, exact save calls, and exact patches. It also gives the human something rare in AI systems: a chance to inspect the same truth the model is using.
 
----
+The system is also intentionally modest in its implementation style. It avoids remote package installation. It keeps dependencies low. It uses mounted XML roots, small web components, and direct browser runtime behavior instead of burying logic behind a heavy stack. That simplicity is not nostalgia. It is a strategy for keeping the system legible to both humans and models. A declarative object that can be read in one pass is more valuable here than an abstract framework pattern that requires a lecture to explain.
 
-Create a command with one HTTP call.
+Neurosymbolic is therefore not just a browser shell and not just an AI coding harness. It is an argument about how software should present itself to machine intelligence. The argument is that systems become more editable when they externalize their structure, that conversational programming becomes more precise when prompts are grounded in visible context, and that symbolic state, reusable commands, one-off workflows, and card-based output can together form a programming environment that feels less like a chatbot bolted onto an app and more like a world that is learning how to describe and remake itself.
 
-```
-POST /xml/commands/my-command
-Content-Type: application/xml
-
-<Command name="my-command" ...>
-  <Function>
-    export async function main(parameters, context) { ... }
-  </Function>
-</Command>
-```
-
-The server extracts the `<Function>` content, writes `src/index.js`, stores the definition with a `src` reference, and generates a README. The browser imports the module on next boot.
-
----
-
-The AI proposes. The user saves. The OS reloads.
-
-```
-<Action use="command-builder" target="alert" goal="add dismissible support" />
-```
-
-An editor card opens in the chat. The current command XML is there — with its implementation inlined. Edit. Click Save. Done.
-
----
-
-Command functions run against a controlled context. No globals. No side-channel access.
-
-```js
-export async function main({ to, text = "Continue" }, context) {
-  const button = document.createElement("x-button");
-  button.setAttribute("text", text);
-  button.addEventListener("click", () => context.state.goto(to));
-  context.chat.print(button);
-}
-```
-
-`context.fetch` · `context.chat` · `context.state` · `context.xml` · `context.commands` · `context.workflows`
-
----
-
-The HTTP server is 250 lines of Node built-ins. No Express. No dependencies. The process manager is a single file with daemon mode, hot reload, exponential backoff, and log routing. The reactive system powering the UI fits in one class.
-
----
-
-The whole corpus is a directory tree. Each command is a folder. The AI never sees the file system.
-
-```
-xml/commands/
-  alert/
-    Command.xml
-    README.md        ← auto-generated
-    src/
-      index.js       ← extracted from <Function>
-```
-
----
-
-`npm start` · `npm run dev` · `npm run logs -- alert`
-
-The AI is already inside.
+To run it, start the local process manager with `npm start` or `npm run dev`, open the browser shell, and inspect the dashboard. From there the intended workflow is almost ceremonial: begin from a clean snapshot, read the world, choose a node, open its robot actions, refine a draft, and let the AI propose a reviewable change. The software is trying to make that loop elegant. That is the real idea captured here: not AI replacing software design, but software arranging itself so intelligence, structure, and change can finally meet in the same place.

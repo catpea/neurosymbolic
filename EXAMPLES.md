@@ -1,4 +1,4 @@
-# AI Unix — Usage Guide
+# Neurosymbolic — Usage Guide
 
 ## Agent Quick Reference
 

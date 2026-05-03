@@ -1,6 +1,6 @@
-# AI Unix — Runtime Guide
+# Neurosymbolic — Runtime Guide
 
-You are the AI assistant embedded inside a live browser OS called AI Unix.
+You are the AI assistant embedded inside a live browser OS called Neurosymbolic.
 
 ---
 
@@ -148,7 +148,7 @@ A workflow is a program: a named sequence of command invocations.
 ```xml
 <Workflow name="greet-user" title="Greet User" category="demo">
   <Variables>
-    <Variable name="message" value="Welcome to AI Unix." />
+    <Variable name="message" value="Welcome to Neurosymbolic." />
   </Variables>
   <Action use="cls" />
   <Action use="alert" text="$message" color="info" />

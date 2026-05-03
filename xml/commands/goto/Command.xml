@@ -12,6 +12,6 @@
     <Example title="Child state"><Action use="goto" to="hello-world" text="Run Hello World" color="primary" /></Example>
     <Example title="Parent state"><Action use="goto" to=".." text="Back" color="secondary" /></Example>
   </Examples>
-  <Improve>Make this command stronger like a Unix tool. Add optional behavior as settings rather than creating separate navigation commands.</Improve>
+  <Improve>Make this command stronger as a parameterized shell tool. Add optional behavior as settings rather than creating separate navigation commands.</Improve>
   <Function src="src/index.js"/>
 </Command>

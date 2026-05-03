@@ -1,6 +1,6 @@
 # Agent Guide — xml/commands/
 
-This directory is the command corpus for AI Unix. Each subdirectory is one command.
+This directory is the command corpus for Neurosymbolic. Each subdirectory is one command.
 
 Commands are the reusable abilities of the OS. They live in the `/cmd` namespace and are invoked by workflows. An AI agent should improve existing commands before creating new ones, and create new commands before writing one-off workflow logic.
 

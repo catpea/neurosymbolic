@@ -18,6 +18,10 @@ export class AIChatElement extends ReactiveHTMLElement {
     this.activeSkills = new Set();
     this.messages = [];
     this.messagesNode = null;
+    this.textarea = null;
+    this.agentSelect = null;
+    this.statusNode = null;
+    this.skillInputs = new Map();
   }
 
   mount() {
@@ -33,6 +37,7 @@ export class AIChatElement extends ReactiveHTMLElement {
     const textarea = document.createElement("textarea");
     textarea.className = "form-control";
     textarea.rows = 6;
+    this.textarea = textarea;
 
     // ── Agent selector ────────────────────────────────────────────────────
     const agentRow = document.createElement("div");
@@ -44,6 +49,7 @@ export class AIChatElement extends ReactiveHTMLElement {
 
     const agentSelect = document.createElement("select");
     agentSelect.className = "form-select form-select-sm w-auto";
+    this.agentSelect = agentSelect;
     const defaultOpt = document.createElement("option");
     defaultOpt.value = "";
     defaultOpt.textContent = "General";
@@ -86,6 +92,7 @@ export class AIChatElement extends ReactiveHTMLElement {
         else this.activeSkills.delete(skill);
       });
 
+      this.skillInputs.set(skill, input);
       skillGroup.append(input, label);
     }
 
@@ -113,6 +120,7 @@ export class AIChatElement extends ReactiveHTMLElement {
     const status = document.createElement("div");
     status.className = "small text-body-secondary";
     status.textContent = "Ready.";
+    this.statusNode = status;
 
     controls.append(ask, showContext, clear);
 
@@ -197,6 +205,49 @@ export class AIChatElement extends ReactiveHTMLElement {
 
   os() {
     return document.querySelector("x-os");
+  }
+
+  applyTemplate({ goal = "", agent = "", skills = [], note = "Template loaded. Adjust it, then ask AI." } = {}) {
+    const nextGoal = String(goal ?? "");
+    const nextAgent = AGENTS.includes(String(agent || "").toLowerCase())
+      ? String(agent).toLowerCase()
+      : "";
+    const nextSkills = new Set((skills || []).filter(skill => SKILLS.includes(skill)));
+
+    this.signal("goal").value = nextGoal;
+    this.signal("agent").value = nextAgent;
+    this.activeSkills = nextSkills;
+
+    if (this.textarea && this.textarea.value !== nextGoal) {
+      this.textarea.value = nextGoal;
+    }
+
+    if (this.agentSelect) {
+      this.agentSelect.value = nextAgent;
+    }
+
+    for (const [skill, input] of this.skillInputs) {
+      input.checked = nextSkills.has(skill);
+    }
+
+    if (this.statusNode) {
+      this.statusNode.textContent = note;
+    }
+  }
+
+  openTemplate(options = {}) {
+    this.applyTemplate(options);
+
+    const offcanvas = this.closest(".offcanvas");
+    if (offcanvas && window.bootstrap?.Offcanvas) {
+      window.bootstrap.Offcanvas.getOrCreateInstance(offcanvas).show();
+    }
+
+    requestAnimationFrame(() => {
+      this.textarea?.focus();
+      const length = this.textarea?.value?.length || 0;
+      this.textarea?.setSelectionRange?.(length, length);
+    });
   }
 
   renderPlanCard(plan) {

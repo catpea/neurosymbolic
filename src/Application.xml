@@ -1,9 +1,10 @@
 
-<Application name="ai-unix" version="0.1.0">
+<Application name="neurosymbolic" version="0.1.0">
 
   <Screen>
-    <Navbar title="AI Unix" placement="top" color="dark">
+    <Navbar title="Neurosymbolic" placement="top" color="dark">
       <Button text="Commands" icon="bi-terminal" target="#commands-modal" toggle="modal" />
+      <Button text="Dashboard" icon="bi-speedometer" target="#dashboard-modal" toggle="modal" />
       <Button text="AI Chat" icon="bi-stars" target="#ai-chat" toggle="offcanvas" />
     </Navbar>
 
@@ -21,10 +22,14 @@
     <Modal id="commands-modal" title="Command Corpus" size="fullscreen">
       <CommandList />
     </Modal>
+
+    <Modal id="dashboard-modal" title="System Dashboard" size="fullscreen">
+      <SystemDashboard />
+    </Modal>
   </Screen>
 
   <State name="application" initial="shell">
-    <State name="shell" title="AI Unix Shell">
+    <State name="shell" title="Neurosymbolic Shell">
       <Workflow on="enter" use="show-shell" />
       <Workflow on="resume" use="show-shell" />
     </State>
@@ -43,6 +48,9 @@
     <Component name="button" tag="x-button" />
     <Component name="ai-chat" tag="x-ai-chat" />
     <Component name="command-list" tag="x-command-list" />
+    <Component name="node-action-center" tag="x-node-action-center" />
+    <Component name="system-dashboard" tag="x-system-dashboard" />
+    <Component name="tree-ui" tag="x-tree-ui" />
   </Components>
 
   <!--

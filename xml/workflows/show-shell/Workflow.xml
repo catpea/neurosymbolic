@@ -1,6 +1,6 @@
 <Workflow name="show-shell" title="Show Shell" category="system">
   <Variables>
-    <Variable name="message" value="AI Unix: ability lives in /cmd, programs live in /workflows, state lives in /proc." />
+    <Variable name="message" value="Neurosymbolic: ability lives in /cmd, programs live in /workflows, state lives in /proc." />
   </Variables>
 
   <Action use="cls" />
