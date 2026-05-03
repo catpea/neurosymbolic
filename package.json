@@ -2,7 +2,7 @@
   "type": "module",
   "main": "index.js",
   "name": "neurosymbolic",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "scripts": {
     "start": "pm daemon ecosystem.json",
@@ -17,11 +17,9 @@
     "packages/*"
   ],
   "local-dependencies": {
-
     "process-manager": "^1.0.0",
     "application-server": "^1.0.0"
   },
-
   "author": "catpea (https://github.com/catpea)",
   "license": "MIT",
   "repository": {
